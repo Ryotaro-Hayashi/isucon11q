@@ -67,6 +67,18 @@ type Isu struct {
 	UpdatedAt  time.Time `db:"updated_at" json:"-"`
 }
 
+type IsuWithCondition struct {
+	ID         int       `db:"id" json:"id"`
+	JIAIsuUUID string    `db:"jia_isu_uuid" json:"jia_isu_uuid"`
+	Name       string    `db:"name" json:"name"`
+	Image      []byte    `db:"image" json:"-"`
+	Character  string    `db:"character" json:"character"`
+	JIAUserID  string    `db:"jia_user_id" json:"-"`
+	CreatedAt  time.Time `db:"created_at" json:"-"`
+	UpdatedAt  time.Time `db:"updated_at" json:"-"`
+	IsuCondition IsuCondition `db:"isu_condition" json:"-"`
+}
+
 type IsuFromJIA struct {
 	Character string `json:"character"`
 }
@@ -458,58 +470,54 @@ func getIsuList(c echo.Context) error {
 	}
 	defer tx.Rollback()
 
-	isuList := []Isu{}
-	err = tx.Select(
-		&isuList,
-		"SELECT * FROM `isu` WHERE `jia_user_id` = ? ORDER BY `id` DESC",
-		jiaUserID)
-	if err != nil {
+	var isuWithConditionList []IsuWithCondition
+	if err := tx.Select(&isuWithConditionList, "SELECT * FROM isu INNER JOIN isu_condition ON isu.jia_isu_uuid = isu_condition.jia_isu_uuid WHERE isu.jia_isu_uuid = ? ORDER BY isu.id DESC", jiaUserID); err != nil {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
 	}
 
 	responseList := []GetIsuListResponse{}
-	for _, isu := range isuList {
-		var lastCondition IsuCondition
-		foundLastCondition := true
-		err = tx.Get(&lastCondition, "SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` = ? ORDER BY `timestamp` DESC LIMIT 1",
-			isu.JIAIsuUUID)
+	for _, isuWithCondition := range isuWithConditionList {
+		conditionLevel, err := calculateConditionLevel(isuWithCondition.IsuCondition.Condition)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
-				foundLastCondition = false
-			} else {
-				c.Logger().Errorf("db error: %v", err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
+			c.Logger().Error(err)
+			return c.NoContent(http.StatusInternalServerError)
 		}
 
-		var formattedCondition *GetIsuConditionResponse
-		if foundLastCondition {
-			conditionLevel, err := calculateConditionLevel(lastCondition.Condition)
-			if err != nil {
-				c.Logger().Error(err)
-				return c.NoContent(http.StatusInternalServerError)
-			}
-
-			formattedCondition = &GetIsuConditionResponse{
-				JIAIsuUUID:     lastCondition.JIAIsuUUID,
-				IsuName:        isu.Name,
-				Timestamp:      lastCondition.Timestamp.Unix(),
-				IsSitting:      lastCondition.IsSitting,
-				Condition:      lastCondition.Condition,
-				ConditionLevel: conditionLevel,
-				Message:        lastCondition.Message,
-			}
+		formattedCondition := &GetIsuConditionResponse{
+			JIAIsuUUID:     isuWithCondition.IsuCondition.JIAIsuUUID,
+			IsuName:        isuWithCondition.Name,
+			Timestamp:      isuWithCondition.IsuCondition.Timestamp.Unix(),
+			IsSitting:      isuWithCondition.IsuCondition.IsSitting,
+			Condition:      isuWithCondition.IsuCondition.Condition,
+			ConditionLevel: conditionLevel,
+			Message:        isuWithCondition.IsuCondition.Message,
 		}
 
 		res := GetIsuListResponse{
-			ID:                 isu.ID,
-			JIAIsuUUID:         isu.JIAIsuUUID,
-			Name:               isu.Name,
-			Character:          isu.Character,
+			ID:                 isuWithCondition.ID,
+			JIAIsuUUID:         isuWithCondition.JIAIsuUUID,
+			Name:               isuWithCondition.Name,
+			Character:          isuWithCondition.Character,
 			LatestIsuCondition: formattedCondition}
 		responseList = append(responseList, res)
 	}
+
+	//var isuJIAIsuUUIDList []string
+	//var valueStrings []string
+	//for _, isu := range isuList {
+	//	isuJIAIsuUUIDList = append(isuJIAIsuUUIDList, isu.JIAIsuUUID)
+	//	valueStrings = append(valueStrings, "?")
+	//}
+
+	//var isuConditionList []IsuCondition
+	//query := fmt.Sprintf("SELECT * FROM `isu_condition` WHERE `jia_isu_uuid` in %s ORDER BY `timestamp` DESC", "(" + strings.Join(valueStrings, ",") + ")")
+	//sql, params, err := sqlx.In(query, isuJIAIsuUUIDList)
+	//if err != nil {
+	//	log.Fatal(err)
+	//}
+	//if tx.Select(&isuConditionList, sql, params...); err != nil {
+	//}
 
 	err = tx.Commit()
 	if err != nil {
