@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,11 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/sessions"
 	"github.com/jmoiron/sqlx"
-	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
 )
@@ -1159,11 +1156,11 @@ func getTrend(c echo.Context) error {
 // ISUからのコンディションを受け取る
 func postIsuCondition(c echo.Context) error {
 	// TODO: 一定割合リクエストを落としてしのぐようにしたが、本来は全量さばけるようにすべき
-	dropProbability := 0.9
-	if rand.Float64() <= dropProbability {
-		c.Logger().Warnf("drop post isu condition request")
-		return c.NoContent(http.StatusAccepted)
-	}
+	//dropProbability := 0.9
+	//if rand.Float64() <= dropProbability {
+	//	c.Logger().Warnf("drop post isu condition request")
+	//	return c.NoContent(http.StatusAccepted)
+	//}
 
 	jiaIsuUUID := c.Param("jia_isu_uuid")
 	if jiaIsuUUID == "" {
@@ -1186,7 +1183,7 @@ func postIsuCondition(c echo.Context) error {
 	defer tx.Rollback()
 
 	var count int
-	err = tx.Get(&count, "SELECT COUNT(*) FROM `isu` WHERE `jia_isu_uuid` = ?", jiaIsuUUID)
+	err = tx.Get(&count, "SELECT * FROM `isu` WHERE `jia_isu_uuid` = ?", jiaIsuUUID)
 	if err != nil {
 		c.Logger().Errorf("db error: %v", err)
 		return c.NoContent(http.StatusInternalServerError)
