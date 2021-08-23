@@ -28,8 +28,8 @@ jobs:
     needs: setup
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: build
+      - name: Build
+        uses: actions/checkout@v2
         run: go build ./...
      #- name: get dependencies
      #run: go get -v -t -d ./...
@@ -39,16 +39,16 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: test
+      - name: Test
+        uses: actions/checkout@v2
         run:  go test ./... -v
 
   lint:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+      - uses: actions/checkout@v2
+      - uses: golangci/golangci-lint-action@v2
         with:
           version: latest
