@@ -30,8 +30,8 @@ jobs:
     steps:
       - name: Check out
         uses: actions/checkout@v2
-      - name: get dependencies
-        run: go get -v -t -d ./...
+      - name: Get dependencies
+        run: go install ./...
       - name: Build
         run: go build ./...
 
